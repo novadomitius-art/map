@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from map_ops import transfer_territory, apply_trace, rings_to_shape, shape_to_rings
 from shapely.ops import unary_union
 from shapely.validation import make_valid
+from shapely.geometry import Polygon, MultiPolygon
 
 
 ROOT_DIR = Path(__file__).parent
@@ -79,8 +80,28 @@ def _mark_shapes_dirty():
     NATION_SHAPES["dirty"] = True
 
 
+def _drop_small_holes(geom, min_hole_area):
+    """Remove tiny interior rings (artifacts from imperfect province tiling)
+    while keeping genuinely large enclaves."""
+    if geom is None or geom.is_empty:
+        return geom
+    if geom.geom_type == "Polygon":
+        holes = [r for r in geom.interiors if Polygon(r).area >= min_hole_area]
+        return Polygon(geom.exterior, holes)
+    if geom.geom_type == "MultiPolygon":
+        return MultiPolygon([_drop_small_holes(g, min_hole_area) for g in geom.geoms])
+    return geom
+
+
 def _compute_nation_shapes():
-    """Merged + smoothed territory outline per nation (soft organic borders)."""
+    """Exact merged territory outline per nation (grid-based, no smoothing).
+
+    The frontend uses THIS geometry for both the coloured fill and the border
+    stroke, so they always coincide. It is the true union of the nation's
+    province polygons: neighbouring realms therefore share identical grid edges
+    (no gaps, no doubled borders). We only drop tiny interior sliver-holes so
+    there are no stray lines inside a realm.
+    """
     by_nation = {}
     for p in STATE["provinces"]:
         by_nation.setdefault(p["nation_id"], []).append(rings_to_shape(p["polygons"]))
@@ -90,10 +111,8 @@ def _compute_nation_shapes():
         if not gs:
             continue
         u = make_valid(unary_union(gs))
-        sm = u.simplify(0.0008).buffer(0.0035, join_style=1, quad_segs=3).buffer(
-            -0.0035, join_style=1, quad_segs=3)
-        sm = make_valid(sm)
-        out[nid] = shape_to_rings(sm if not sm.is_empty else u)
+        u = _drop_small_holes(u, 0.0009)
+        out[nid] = shape_to_rings(u)
     return out
 
 

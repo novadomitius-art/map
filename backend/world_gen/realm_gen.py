@@ -96,7 +96,13 @@ def shade_color(hex_color, rng):
 
 
 def gen_vassals(nations, rng=None):
-    """Generate additional vassals under every major power. Returns new nation dicts."""
+    """Generate vassals under every major power. Returns new nation dicts.
+
+    Realms are meant to be MAJORITY-vassal, so we create a generous number of
+    vassals per overlord and spread their seats across the overlord's anchors so
+    they cover the whole realm (the generator's majority-vassal pass then hands
+    most overlord land to the nearest vassal)."""
+    import math
     rng = rng or random.Random(892)
     used_names = set()
     by_overlord = {}
@@ -104,7 +110,11 @@ def gen_vassals(nations, rng=None):
         if n.get("overlord"):
             by_overlord.setdefault(n["overlord"], []).append(n)
 
-    targets = {"empire": 8, "kingdom": 5, "sultanate": 5, "theocracy": 4, "confederacy": 4}
+    targets = {
+        "empire": 11, "kingdom": 8, "sultanate": 8, "theocracy": 6, "confederacy": 6,
+        "khanate": 6, "free_kingdom": 5, "grand_duchy": 5, "merchant_republic": 5,
+        "tribal_kingdom": 5, "federation": 5, "duchy": 4, "principality": 4,
+    }
     new_nations = []
     for n in nations:
         if n.get("overlord") or n["tier"] not in targets:
@@ -116,11 +126,19 @@ def gen_vassals(nations, rng=None):
         for k in range(max(0, want - have)):
             tier, pattern, title, _w = rng.choices(pool, weights=[p[3] for p in pool])[0]
             place = make_name(rng, n["culture"], used_names)
-            ax, ay = anchors[rng.randrange(len(anchors))]
+            # Spread vassals across ALL the overlord's anchors (round-robin) so
+            # they fill the whole realm rather than clustering at one point.
+            ax, ay = anchors[k % len(anchors)]
             ang = rng.uniform(0, 6.28318)
-            dist = rng.uniform(0.035, 0.075)
-            sx = min(0.99, max(0.01, ax + dist * rng.uniform(0.6, 1.0) * __import__("math").cos(ang)))
-            sy = min(0.95, max(0.01, ay + dist * rng.uniform(0.6, 1.0) * __import__("math").sin(ang)))
+            dist = rng.uniform(0.02, 0.055)
+            sx = min(0.99, max(0.01, ax + dist * rng.uniform(0.5, 1.0) * math.cos(ang)))
+            sy = min(0.95, max(0.01, ay + dist * rng.uniform(0.5, 1.0) * math.sin(ang)))
+            # A second seed point gives each vassal a larger, more natural
+            # territory footprint.
+            ang2 = ang + rng.uniform(1.8, 4.5)
+            d2 = rng.uniform(0.018, 0.042)
+            sx2 = min(0.99, max(0.01, sx + d2 * math.cos(ang2)))
+            sy2 = min(0.95, max(0.01, sy + d2 * math.sin(ang2)))
             army = rng.randint(12, 55)
             econ = rng.randint(15, 60)
             seat_name = make_name(rng, n["culture"], used_names)
@@ -140,7 +158,7 @@ def gen_vassals(nations, rng=None):
                 economy=econ,
                 description=f"A {tier.replace('_', ' ')} sworn to {n['name']}.",
                 lore=rng.choice(VASSAL_LORE).format(overlord=n["name"], place=place),
-                seed_points=[(sx, sy)],
+                seed_points=[(sx, sy), (sx2, sy2)],
                 settlements=[dict(
                     name=seat_name, type="city", x=sx, y=sy,
                     description=f"Seat of the {tier.replace('_', ' ')} of {place}.",

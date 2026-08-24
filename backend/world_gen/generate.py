@@ -33,7 +33,7 @@ from world_gen.realm_gen import gen_vassals, gen_settlements, compute_influence,
 
 EXTRACT_PATH = Path(__file__).parent / "extracted_mask.json"
 
-LATTICE_SPACING = 0.024      # ~1300 land cells
+LATTICE_SPACING = 0.017      # ~2950 land cells (denser grid)
 JITTER = 0.38                # fraction of spacing
 SIMPLIFY_TOL = 0.0008
 
@@ -212,9 +212,11 @@ def generate_world():
         clipped = make_valid(cell.intersection(land))
         if clipped.is_empty or clipped.area < 1e-6:
             continue
-        clipped = make_valid(clipped.simplify(SIMPLIFY_TOL, preserve_topology=True))
-        if clipped.is_empty or clipped.area < 1e-6:
-            continue
+        # NOTE: do NOT simplify per-cell here. Simplifying each cell
+        # independently makes edges shared with neighbouring cells diverge,
+        # opening pixel-wide slivers that read as "holes between borders" when
+        # nations are dissolved. Keeping the raw Voronoi geometry guarantees
+        # adjacent cells (and therefore adjacent realms) share identical edges.
         d = np.sqrt(((anchor_xy - np.array([cx, cy])) ** 2).sum(axis=1))
         scores = d / anchor_weight
         nid = anchor_nation[int(np.argmin(scores))]
@@ -241,6 +243,44 @@ def generate_world():
                 p["nation_id"] = n["id"]
                 nation_cells[n["id"]].append(p["id"])
                 break
+
+    # ---- 5b) Make realms MAJORITY-VASSAL ---------------------------------
+    # An overlord should directly hold only a compact core around its capital;
+    # the bulk of the realm's land belongs to its sworn vassals. We keep the
+    # overlord's cells nearest its capital (a minority share) and hand the rest
+    # to the geographically nearest vassal.
+    OVERLORD_CORE_FRAC = 0.30  # overlord keeps ~30% of the realm -> vassals ~70%
+    _nation_by_id = {n["id"]: n for n in all_nations}
+    vassals_by_overlord = {}
+    for n in all_nations:
+        if n.get("overlord"):
+            vassals_by_overlord.setdefault(n["overlord"], []).append(n)
+    for oid, vassals in vassals_by_overlord.items():
+        if not vassals:
+            continue
+        own = list(nation_cells.get(oid, []))
+        realm_total = len(own) + sum(len(nation_cells[v["id"]]) for v in vassals)
+        if realm_total == 0 or len(own) < 2:
+            continue
+        keep = max(1, int(round(realm_total * OVERLORD_CORE_FRAC)))
+        if len(own) <= keep:
+            continue
+        onat = _nation_by_id.get(oid)
+        cap = onat["seed_points"][0] if onat and onat.get("seed_points") else (0.5, 0.5)
+        own_sorted = sorted(
+            own, key=lambda pid: (prov_by_id[pid]["seed"][0] - cap[0]) ** 2
+            + (prov_by_id[pid]["seed"][1] - cap[1]) ** 2)
+        reassign = own_sorted[keep:]
+        vseeds = [(v["id"], v["seed_points"][0]) for v in vassals if v.get("seed_points")]
+        if not vseeds:
+            continue
+        for pid in reassign:
+            sx, sy = prov_by_id[pid]["seed"]
+            vid = min(vseeds, key=lambda vs: (vs[1][0] - sx) ** 2 + (vs[1][1] - sy) ** 2)[0]
+            nation_cells[oid].remove(pid)
+            prov_by_id[pid]["nation_id"] = vid
+            nation_cells[vid].append(pid)
+
 
     # ---- 6) Terrain + province names --------------------------------------
     used_prov_names = set()

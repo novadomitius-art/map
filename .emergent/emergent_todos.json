@@ -1,22 +1,18 @@
 [
   {
-    "content": "Fix camera panning so black void can't be revealed from the sides",
+    "content": "Fix holes/gaps between nation borders (remove per-cell simplify so cells tile exactly)",
     "status": "completed"
   },
   {
-    "content": "Add crisp inked nation border outlines (hugging the fill) with soft dark shadow depth",
+    "content": "Make overlord realms (empires/kingdoms/duchies) majority-vassal",
     "status": "completed"
   },
   {
-    "content": "Add the provinces-style dark shadowy depth to political fills without grid",
+    "content": "Increase grid density and keep angular grid borders (no smoothing)",
     "status": "completed"
   },
   {
-    "content": "Change the capital city symbol to a distinctive crown",
-    "status": "completed"
-  },
-  {
-    "content": "Verify all views + zoom/pan via screenshots",
-    "status": "completed"
+    "content": "Verify via testing_agent (backend + frontend)",
+    "status": "in_progress"
   }
 ]

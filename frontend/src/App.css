@@ -749,31 +749,32 @@
   filter: drop-shadow(0 0 5px rgba(247,215,107,0.65));
 }
 
-/* Crisp inked realm outline: clean, dark, high-contrast so each kingdom reads
-   as clearly separated. Non-scaling stroke keeps it razor-sharp at every zoom. */
+/* Crisp inked realm outline: thin, dark, high-contrast so each kingdom reads
+   as clearly separated. Non-scaling stroke keeps it razor-sharp at every zoom
+   and matches the slim weight of the Provinces-mode grid lines. */
 .nation-border.inked {
   fill: none;
   stroke: #170b03;
-  stroke-width: 1.6;
+  stroke-width: 0.9;
   stroke-linejoin: round;
   stroke-linecap: round;
-  opacity: 0.95;
+  opacity: 0.92;
   pointer-events: none;
 }
 .nation-border.inked.selected {
   stroke: #f7d76b;
-  stroke-width: 3;
+  stroke-width: 2.2;
   opacity: 1;
   filter: drop-shadow(0 0 6px rgba(247,215,107,0.7));
 }
-/* Soft recessed shadow between realms -> "shadowy" province-map depth, no grid. */
+/* Soft recessed shadow between realms -> subtle "shadowy" province-map depth. */
 .nation-border-shadow {
   fill: none;
   stroke: #0a0402;
-  stroke-width: 5;
+  stroke-width: 3;
   stroke-linejoin: round;
   stroke-linecap: round;
-  opacity: 0.45;
+  opacity: 0.3;
   pointer-events: none;
 }
 .vassal-sub {

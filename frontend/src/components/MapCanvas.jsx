@@ -74,23 +74,6 @@ export default function MapCanvas({
     return arr;
   }, [world.nations, provincesByNation]);
 
-  // Combined fill path per nation: all of a realm's province polygons merged
-  // into ONE path so the fill is painted a single time. This removes the faint
-  // internal seams you get when many semi-transparent tiles share edges, so a
-  // realm reads as one perfectly flat colour (Provinces look, zero grid).
-  const nationFillPath = useMemo(() => {
-    const m = new Map();
-    for (const [nid, provs] of provincesByNation.entries()) {
-      const merged = [];
-      for (const p of provs) {
-        if (p.polygons) for (const poly of p.polygons) merged.push(poly);
-      }
-      const d = polygonToPath(merged);
-      if (d) m.set(nid, d);
-    }
-    return m;
-  }, [provincesByNation]);
-
   // ---------- d3-zoom ----------
   // The SVG uses a pixel viewBox (0 0 MAP_W MAP_H) with preserveAspectRatio
   // "meet", so on wide screens the map is letter-boxed. d3-zoom by default
@@ -185,6 +168,21 @@ export default function MapCanvas({
   const showNationShapes = viewMode === 'political' || viewMode === 'religion' || viewMode === 'vassals';
   const showNationFill = showNationShapes; // province-based nation colouring (no grid)
   const showProvinceTiles = viewMode === 'provinces';
+
+  // One SVG path per nation, built from the EXACT province-union outline. Used
+  // for the fill AND the border strokes so they always coincide (no doubled /
+  // gapped borders).
+  const nationShapePath = useMemo(() => {
+    const m = new Map();
+    for (const n of world.nations) {
+      const rings = nationShapes[n.id];
+      if (!rings || !rings.length) continue;
+      const d = polygonToPath(rings);
+      if (d) m.set(n.id, d);
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world.nations, world.nation_shapes]);
 
   function fillForNation(nation) {
     if (viewMode === 'religion') {
@@ -366,7 +364,7 @@ export default function MapCanvas({
           {showNationFill && (
             <g>
               {sortedNations.map((n) => {
-                const d = nationFillPath.get(n.id);
+                const d = nationShapePath.get(n.id);
                 if (!d) return null;
                 const isSel = n.id === selectedNationId;
                 const col = fillForNation(n);
@@ -398,9 +396,7 @@ export default function MapCanvas({
               {/* shadow pass */}
               <g pointerEvents="none" filter="url(#border-shadow-blur)">
                 {sortedNations.map((n) => {
-                  const rings = nationShapes[n.id];
-                  if (!rings || !rings.length) return null;
-                  const d = polygonToPath(rings);
+                  const d = nationShapePath.get(n.id);
                   if (!d) return null;
                   return (
                     <path key={'nsh-' + n.id} className="nation-border-shadow"
@@ -411,12 +407,10 @@ export default function MapCanvas({
               {/* crisp ink pass */}
               <g pointerEvents="none">
                 {sortedNations.map((n) => {
-                  const rings = nationShapes[n.id];
-                  if (!rings || !rings.length) return null;
-                  const d = polygonToPath(rings);
+                  const d = nationShapePath.get(n.id);
                   if (!d) return null;
                   if (viewMode === 'vassals' && n.overlord) {
-                    const w = 0.7 + (n.influence || 20) / 45;
+                    const w = 0.7 + (n.influence || 20) / 60;
                     return (
                       <path key={'vb-' + n.id} className="vassal-sub" d={d}
                         vectorEffect="non-scaling-stroke" style={{ strokeWidth: w }} />
@@ -488,15 +482,15 @@ export default function MapCanvas({
                 if (!isMajor && transform.k < 2.2) return null;          // minors need some zoom
                 const cls = 'nation-label ' + (nation.tier === 'empire' ? 'empire' :
                   isMajor ? 'kingdom' : 'minor');
-                // Damp label growth when zooming (grows ~k^0.35 instead of k)
+                // Damp label growth when zooming (grows ~k^0.35 instead of k).
                 const damp = 1 / Math.pow(transform.k, 0.65);
-                // Fade the huge realm names once vassal labels take over
-                const fade = isMajor && transform.k > 4.5
-                  ? Math.max(0.25, 1 - (transform.k - 4.5) / 5) : 1;
+                // Realm names should recede as you zoom in so the settlement
+                // labels take over -> opacity drops steadily with zoom.
+                const fade = Math.max(0.12, Math.min(1, 1.2 - transform.k * 0.15));
                 return (
                   <text key={nation.id} className={cls}
                     transform={`translate(${cx * MAP_W}, ${cy * MAP_W}) scale(${damp.toFixed(4)})`}
-                    opacity={fade}>
+                    opacity={fade.toFixed(3)}>
                     {nation.name.replace(/^(Empire|Kingdom|Sultanate|Theocracy|Confederacy|Duchy|Free City|Principality|Republic|Margraviate|Barony|Jarldom|Emirate|Beylik|Waziriate|Grand Duchy|Wardenship|Enclave|Grove-Kingdom|Prelacy|Templar-March|Cantonment|Fenlands Domain|Free Kingdom|Ordermarch|Vampiric Duchy|Necrotheocracy|Deep-Hold|Wyrm-Cult|Confederation|Merchant-Republic|Free Republic|Barbarian Confederacy|Isle-Kingdom|County|Sultanate|Theocratic Marches|Demarchy|United Clans|Tribal Kingdom|Broken Kingdom|Technocratic Republic|Plombulate|Prince-Bishopric|Khanate|Tribal Federation) of /, '')}
                   </text>
                 );
