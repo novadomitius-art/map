@@ -76,7 +76,7 @@
   position: absolute;
   top: 62px; left: 0; right: 0; bottom: 0;
   overflow: hidden;
-  background: #0d0704;
+  background: radial-gradient(ellipse at center, #10161d 0%, #080b10 70%, #05070a 100%);
 }
 .map-svg {
   width: 100%;
@@ -747,6 +747,34 @@
   stroke-width: 2.6;
   opacity: 1;
   filter: drop-shadow(0 0 5px rgba(247,215,107,0.65));
+}
+
+/* Crisp inked realm outline: clean, dark, high-contrast so each kingdom reads
+   as clearly separated. Non-scaling stroke keeps it razor-sharp at every zoom. */
+.nation-border.inked {
+  fill: none;
+  stroke: #170b03;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.95;
+  pointer-events: none;
+}
+.nation-border.inked.selected {
+  stroke: #f7d76b;
+  stroke-width: 3;
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(247,215,107,0.7));
+}
+/* Soft recessed shadow between realms -> "shadowy" province-map depth, no grid. */
+.nation-border-shadow {
+  fill: none;
+  stroke: #0a0402;
+  stroke-width: 5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.45;
+  pointer-events: none;
 }
 .vassal-sub {
   fill: none;

@@ -3,8 +3,9 @@ import React from 'react';
 const rows = [
   { icon: (
       <svg width="18" height="18" viewBox="-10 -10 20 20">
-        <circle r="7" fill="#f6e4a5" stroke="#3b2408" strokeWidth="1.2" />
-        <polygon points={pts(4)} fill="#b8873a" stroke="#3b2408" strokeWidth="0.5" />
+        <path d="M-8,6 L-8,-3 L-3.9,1 L0,-6.4 L3.9,1 L8,-3 L8,6 Z"
+          fill="#f2c94c" stroke="#3b2408" strokeWidth="1.2" strokeLinejoin="round" />
+        <rect x="-8" y="4" width="16" height="2.8" fill="#c9992e" stroke="#3b2408" strokeWidth="0.9" />
       </svg>), label: 'Capital City' },
   { icon: (<svg width="18" height="18" viewBox="-10 -10 20 20">
       <circle r="6" fill="#e2c072" stroke="#2a1808" strokeWidth="1" />
@@ -36,16 +37,6 @@ const rows = [
       <line x1="-5" y1="0" x2="5" y2="0" stroke="#2a1808" strokeWidth="1.5"/>
     </svg>), label: 'Holy Site' },
 ];
-
-function pts(size) {
-  const arr = [];
-  for (let i = 0; i < 10; i++) {
-    const a = (Math.PI / 5) * i - Math.PI / 2;
-    const r = i % 2 === 0 ? size : size * 0.45;
-    arr.push(`${(Math.cos(a) * r).toFixed(1)},${(Math.sin(a) * r).toFixed(1)}`);
-  }
-  return arr.join(' ');
-}
 
 export default function Legend() {
   return (

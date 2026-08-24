@@ -92,17 +92,20 @@ export default function MapCanvas({
   }, [provincesByNation]);
 
   // ---------- d3-zoom ----------
-  // The SVG uses a pixel viewBox (0 0 MAP_W MAP_H) so the identity transform
-  // is a perfect "fit" view. Zoom transforms are in viewBox coordinates.
+  // The SVG uses a pixel viewBox (0 0 MAP_W MAP_H) with preserveAspectRatio
+  // "meet", so on wide screens the map is letter-boxed. d3-zoom by default
+  // assumes the viewport equals the viewBox, which lets panning drag the map
+  // edge inward and reveal the dark background. To lock the camera to the map
+  // we feed d3 the REAL visible viewBox region (computed from the element's
+  // pixel size) as its extent, and set translateExtent to the map rectangle.
+  // d3 then centres the map when it is smaller than the viewport and clamps
+  // panning at the edges when zoomed in -> the void can never slide in.
   useEffect(() => {
-    const svg = d3.select(svgRef.current);
+    const svgEl = svgRef.current;
+    const svg = d3.select(svgEl);
     const worldG = d3.select(worldGroupRef.current);
     const zoomBehav = d3zoom()
       .scaleExtent([1, 14])
-      // Lock the camera strictly to the map image: the visible viewport can
-      // never leave the [0,0 .. MAP_W,MAP_H] rectangle, so you cannot look
-      // "outside" the map. At k=1 this is a perfect fit (no panning).
-      .extent([[0, 0], [MAP_W, MAP_H]])
       .translateExtent([[0, 0], [MAP_W, MAP_H]])
       .on('zoom', (event) => {
         currentTransformRef.current = event.transform;
@@ -114,10 +117,26 @@ export default function MapCanvas({
         if (editorMode === 'draw-lasso' || editorMode === 'trace-draw') return event.type === 'wheel';
         return !event.button;
       });
+
+    const applyExtent = () => {
+      const rect = svgEl.getBoundingClientRect();
+      const W = rect.width || MAP_W;
+      const H = rect.height || MAP_H;
+      // "meet" base scale: viewBox units -> pixels.
+      const s0 = Math.min(W / MAP_W, H / MAP_H) || 1;
+      // Half of the letter-box gap expressed back in viewBox units.
+      const padX = (W - s0 * MAP_W) / 2 / s0;
+      const padY = (H - s0 * MAP_H) / 2 / s0;
+      zoomBehav.extent([[-padX, -padY], [MAP_W + padX, MAP_H + padY]]);
+      svg.call(zoomBehav.transform, currentTransformRef.current);
+    };
+
     svg.call(zoomBehav);
-    // Re-apply the current transform (identity on first mount = full map fit)
-    svg.call(zoomBehav.transform, currentTransformRef.current);
-    return () => { svg.on('.zoom', null); };
+    applyExtent();
+
+    const ro = new ResizeObserver(applyExtent);
+    ro.observe(svgEl);
+    return () => { ro.disconnect(); svg.on('.zoom', null); };
   }, [editorMode]);
 
   // ---------- pointer -> normalized world coords helper ----------
@@ -297,7 +316,7 @@ export default function MapCanvas({
         onMouseMove={onSvgMouseMove}
         onMouseUp={onSvgMouseUp}
         onMouseLeave={onSvgMouseUp}
-        style={{ background: '#0d0704' }}
+        style={{ background: 'transparent' }}
       >
         <defs>
           <filter id="parchment-vignette">
@@ -307,9 +326,23 @@ export default function MapCanvas({
             <feGaussianBlur stdDeviation="1.4" result="blur"/>
             <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
+          {/* Soft blurred dark strokes used for the "recessed" border shadow
+              that gives realms depth (province-map feel, no grid). Applied to a
+              whole group at once so it stays cheap. */}
+          <filter id="border-shadow-blur" x="-10%" y="-10%" width="120%" height="120%">
+            <feGaussianBlur stdDeviation="2.2" />
+          </filter>
         </defs>
 
         <g ref={worldGroupRef}>
+          {/* Deep-sea backdrop extending well beyond the map so the letter-box
+              area around a wide screen reads as open ocean, never a black void.
+              It sits inside the zoom group, so it follows the map at all times. */}
+          <rect
+            x={-MAP_W} y={-MAP_H}
+            width={MAP_W * 3} height={MAP_H * 3}
+            fill="#0c1218" pointerEvents="none"
+          />
           {/* Base map background (pixel coords 0..MAP_W x 0..MAP_H) */}
           <image
             href="/maps/base_map.webp"
@@ -355,29 +388,49 @@ export default function MapCanvas({
             </g>
           )}
 
-          {/* Soft organic borders over nation shapes */}
+          {/* Nation borders: two passes over each realm's DISSOLVED outline
+              (nation_shapes = the union boundary, so NO internal province grid).
+              (1) a soft, blurred dark stroke = recessed "shadow valley" between
+                  kingdoms (the shadowy depth of the province map, no grid);
+              (2) a thin crisp inked stroke = clean separation between realms. */}
           {showNationShapes && (
-            <g pointerEvents="none">
-              {sortedNations.map((n) => {
-                const rings = nationShapes[n.id];
-                if (!rings || !rings.length) return null;
-                const d = polygonToPath(rings);
-                if (!d) return null;
-                if (viewMode === 'vassals' && n.overlord) {
-                  const w = 0.7 + (n.influence || 20) / 45; // strong vassals draw bolder
+            <>
+              {/* shadow pass */}
+              <g pointerEvents="none" filter="url(#border-shadow-blur)">
+                {sortedNations.map((n) => {
+                  const rings = nationShapes[n.id];
+                  if (!rings || !rings.length) return null;
+                  const d = polygonToPath(rings);
+                  if (!d) return null;
                   return (
-                    <path key={'vb-' + n.id} className="vassal-sub" d={d}
-                      vectorEffect="non-scaling-stroke" style={{ strokeWidth: w }} />
+                    <path key={'nsh-' + n.id} className="nation-border-shadow"
+                      d={d} vectorEffect="non-scaling-stroke" />
                   );
-                }
-                const isSel = n.id === selectedNationId;
-                return (
-                  <path key={'nb-' + n.id}
-                    className={'nation-border soft' + (isSel ? ' selected' : '')}
-                    d={d} vectorEffect="non-scaling-stroke" />
-                );
-              })}
-            </g>
+                })}
+              </g>
+              {/* crisp ink pass */}
+              <g pointerEvents="none">
+                {sortedNations.map((n) => {
+                  const rings = nationShapes[n.id];
+                  if (!rings || !rings.length) return null;
+                  const d = polygonToPath(rings);
+                  if (!d) return null;
+                  if (viewMode === 'vassals' && n.overlord) {
+                    const w = 0.7 + (n.influence || 20) / 45;
+                    return (
+                      <path key={'vb-' + n.id} className="vassal-sub" d={d}
+                        vectorEffect="non-scaling-stroke" style={{ strokeWidth: w }} />
+                    );
+                  }
+                  const isSel = n.id === selectedNationId;
+                  return (
+                    <path key={'nb-' + n.id}
+                      className={'nation-border inked' + (isSel ? ' selected' : '')}
+                      d={d} vectorEffect="non-scaling-stroke" />
+                  );
+                })}
+              </g>
+            </>
           )}
 
           {/* Province tiles: terrain tints or the dedicated Provinces view */}
@@ -497,9 +550,17 @@ function SettlementIcon({ s, zoomK, onClick, onMouseEnter, onMouseLeave }) {
       labelY = 22;
       shape = (
         <g>
-          <circle r={10.5} fill="#f6e4a5" stroke="#3b2408" strokeWidth={1.6} />
-          <circle r={6.5} fill="#b8873a" stroke="#3b2408" strokeWidth={1.1} />
-          <StarPath r={4.6} sw={0.8} />
+          {/* Seat-of-power crown */}
+          <path
+            d="M-9,6.5 L-9,-3.2 L-4.4,1.4 L0,-7.2 L4.4,1.4 L9,-3.2 L9,6.5 Z"
+            fill="#f2c94c" stroke="#3b2408" strokeWidth={1.5} strokeLinejoin="round"
+          />
+          <rect x={-9} y={4.2} width={18} height={3.4} rx={0.6}
+            fill="#c9992e" stroke="#3b2408" strokeWidth={1.2} />
+          <circle cx={-9} cy={-3.2} r={1.7} fill="#f6e4a5" stroke="#3b2408" strokeWidth={1} />
+          <circle cx={0} cy={-7.4} r={1.9} fill="#f6e4a5" stroke="#3b2408" strokeWidth={1} />
+          <circle cx={9} cy={-3.2} r={1.7} fill="#f6e4a5" stroke="#3b2408" strokeWidth={1} />
+          <circle cx={0} cy={5.9} r={1.3} fill="#9c2b2b" />
         </g>
       );
       break;
@@ -593,17 +654,6 @@ function SettlementIcon({ s, zoomK, onClick, onMouseEnter, onMouseLeave }) {
       )}
     </g>
   );
-}
-
-function StarPath({ r, sw = 1 }) {
-  // 5-point star.
-  const pts = [];
-  for (let i = 0; i < 10; i++) {
-    const ang = (Math.PI / 5) * i - Math.PI / 2;
-    const rr = i % 2 === 0 ? r : r * 0.45;
-    pts.push(`${(Math.cos(ang) * rr).toFixed(3)},${(Math.sin(ang) * rr).toFixed(3)}`);
-  }
-  return <polygon points={pts.join(' ')} fill="#f6e4a5" stroke="#3b2408" strokeWidth={sw} />;
 }
 
 function AnchorPath({ r, color = '#0d0704' }) {

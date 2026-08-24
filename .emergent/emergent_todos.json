@@ -1,30 +1,22 @@
 [
   {
-    "content": "realm_gen.py: procedural vassals (~50) with influence stats + culture-based name generator + procedural settlements (villages/towns/castles)",
+    "content": "Fix camera panning so black void can't be revealed from the sides",
     "status": "completed"
   },
   {
-    "content": "generate.py v2: ~1300 province lattice, tier-weighted nation assignment, port snapping to water boundary",
+    "content": "Add crisp inked nation border outlines (hugging the fill) with soft dark shadow depth",
     "status": "completed"
   },
   {
-    "content": "server.py: nation_shapes (smoothed merged geometry) in map/state, recomputed after transfer/trace/reset",
+    "content": "Add the provinces-style dark shadowy depth to political fills without grid",
     "status": "completed"
   },
   {
-    "content": "Frontend: Provinces view mode, smooth nation-shape rendering, soft borders, zoom-gated + fixed-size refined icons, damped labels",
+    "content": "Change the capital city symbol to a distinctive crown",
     "status": "completed"
   },
   {
-    "content": "NationPanel: vassals ranked by influence with bars",
+    "content": "Verify all views + zoom/pan via screenshots",
     "status": "completed"
-  },
-  {
-    "content": "No ports on map edges; ports snapped to true water boundary",
-    "status": "completed"
-  },
-  {
-    "content": "Run testing_agent_v3 comprehensive test and fix reported issues",
-    "status": "in_progress"
   }
 ]
