@@ -1,0 +1,30 @@
+[
+  {
+    "content": "realm_gen.py: procedural vassals (~50) with influence stats + culture-based name generator + procedural settlements (villages/towns/castles)",
+    "status": "completed"
+  },
+  {
+    "content": "generate.py v2: ~1300 province lattice, tier-weighted nation assignment, port snapping to water boundary",
+    "status": "completed"
+  },
+  {
+    "content": "server.py: nation_shapes (smoothed merged geometry) in map/state, recomputed after transfer/trace/reset",
+    "status": "completed"
+  },
+  {
+    "content": "Frontend: Provinces view mode, smooth nation-shape rendering, soft borders, zoom-gated + fixed-size refined icons, damped labels",
+    "status": "completed"
+  },
+  {
+    "content": "NationPanel: vassals ranked by influence with bars",
+    "status": "completed"
+  },
+  {
+    "content": "No ports on map edges; ports snapped to true water boundary",
+    "status": "completed"
+  },
+  {
+    "content": "Run testing_agent_v3 comprehensive test and fix reported issues",
+    "status": "in_progress"
+  }
+]

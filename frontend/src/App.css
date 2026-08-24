@@ -1,0 +1,794 @@
+/* ============================================================
+   KELVAROS — Political Map Game
+   Imperator: Rome inspired aesthetic (parchment, ornate, aged)
+   ============================================================ */
+
+:root {
+  --parchment: #ecdcae;
+  --parchment-dark: #c8a97a;
+  --parchment-shade: #b8935a;
+  --ink: #2b1b0d;
+  --ink-soft: #4a3620;
+  --burgundy: #5c1a1a;
+  --burgundy-deep: #3d0d0d;
+  --gold: #c9a24a;
+  --gold-bright: #e8c25c;
+  --gold-deep: #8a6828;
+  --edge: #6b4a24;
+  --panel-bg: linear-gradient(180deg, #f0dfa8 0%, #dcc38a 100%);
+  --panel-border: 2px solid #6b4a24;
+  --panel-shadow: 0 10px 30px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255, 230, 180, 0.35);
+  --btn-shadow: 0 2px 0 #4a3210, 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.App {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+  background: radial-gradient(ellipse at center, #2b1c0e 0%, #150a05 100%);
+}
+
+/* -------- Top Bar -------- */
+.top-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 62px;
+  z-index: 30;
+  background:
+    linear-gradient(180deg, rgba(60,32,12,0.98) 0%, rgba(30,16,6,0.94) 100%);
+  border-bottom: 2px solid var(--gold-deep);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 20px;
+}
+.top-bar .title {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 3px;
+  color: var(--gold-bright);
+  text-shadow: 0 2px 0 #1a0d04, 0 0 8px rgba(232,194,92,0.3);
+}
+.top-bar .subtitle {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 13px;
+  color: var(--parchment);
+  letter-spacing: 2px;
+  opacity: 0.75;
+}
+.top-bar .year {
+  margin-left: auto;
+  font-family: 'Cinzel', serif;
+  font-size: 14px;
+  color: var(--gold);
+  letter-spacing: 2px;
+  padding: 6px 14px;
+  background: rgba(20,10,4,0.7);
+  border: 1px solid var(--gold-deep);
+  border-radius: 2px;
+}
+
+/* -------- Map -------- */
+.map-container {
+  position: absolute;
+  top: 62px; left: 0; right: 0; bottom: 0;
+  overflow: hidden;
+  background: #0d0704;
+}
+.map-svg {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  display: block;
+}
+.map-svg.grabbing { cursor: grabbing; }
+.map-svg.editing  { cursor: crosshair; }
+
+.province-poly {
+  transition: fill-opacity 120ms ease, stroke-width 120ms ease;
+  cursor: pointer;
+}
+.province-poly:hover {
+  fill-opacity: 0.72 !important;
+}
+.province-poly.selected {
+  fill-opacity: 0.78 !important;
+}
+
+.nation-border {
+  fill: none;
+  stroke: #1a0d04;
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  pointer-events: none;
+  opacity: 0.92;
+}
+.nation-border.selected {
+  stroke: #f7d76b;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 6px rgba(247,215,107,0.7));
+}
+.vassal-border {
+  fill: none;
+  stroke: #2a180a;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  stroke-linejoin: round;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Settlement icons */
+.settlement { cursor: pointer; }
+.settlement text {
+  font-family: 'IM Fell English SC', 'Cinzel', serif;
+  fill: #1a0d04;
+  stroke: #f2e3c1;
+  stroke-width: 3;
+  paint-order: stroke;
+  font-size: 11px;
+  pointer-events: none;
+  user-select: none;
+}
+.settlement.capital text { font-size: 15px; font-weight: 700; }
+.settlement.city text { font-size: 12.5px; font-weight: 600; }
+
+/* Nation label */
+.nation-label {
+  font-family: 'Cinzel', serif;
+  fill: #1a0d04;
+  stroke: rgba(236,220,174,0.85);
+  stroke-width: 4;
+  paint-order: stroke;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-anchor: middle;
+  pointer-events: none;
+  user-select: none;
+  text-transform: uppercase;
+}
+.nation-label.empire   { font-size: 46px; letter-spacing: 6px; }
+.nation-label.kingdom  { font-size: 30px; letter-spacing: 4px; }
+.nation-label.minor    { font-size: 16px; letter-spacing: 2px; }
+
+/* -------- View Switcher -------- */
+.view-switcher {
+  position: absolute;
+  top: 78px;
+  left: 20px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: linear-gradient(180deg, rgba(50,28,10,0.94), rgba(30,16,6,0.94));
+  border: 1px solid var(--gold-deep);
+  border-radius: 4px;
+  padding: 8px;
+  box-shadow: var(--panel-shadow);
+}
+.view-switcher .header {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--gold);
+  text-align: center;
+  padding: 4px 8px 6px;
+  border-bottom: 1px solid var(--gold-deep);
+  margin-bottom: 4px;
+}
+.view-btn {
+  background: linear-gradient(180deg, #4a2e14, #2a1a08);
+  color: var(--parchment);
+  border: 1px solid var(--gold-deep);
+  padding: 7px 14px;
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 100ms;
+  border-radius: 2px;
+  min-width: 130px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.view-btn:hover {
+  background: linear-gradient(180deg, #5c3a1c, #382410);
+  color: var(--gold-bright);
+}
+.view-btn.active {
+  background: linear-gradient(180deg, var(--burgundy), var(--burgundy-deep));
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.7), 0 0 0 1px var(--gold);
+}
+.view-btn .icon { width: 14px; height: 14px; display: inline-block; }
+
+/* -------- Legend -------- */
+.legend {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 20;
+  background: linear-gradient(180deg, rgba(50,28,10,0.94), rgba(30,16,6,0.94));
+  border: 1px solid var(--gold-deep);
+  border-radius: 4px;
+  padding: 12px 14px;
+  color: var(--parchment);
+  font-size: 12px;
+  box-shadow: var(--panel-shadow);
+  min-width: 220px;
+}
+.legend .title {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--gold);
+  border-bottom: 1px solid var(--gold-deep);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+.legend-row svg { flex-shrink: 0; }
+.legend-row span { font-family: 'EB Garamond', serif; font-size: 13px; }
+
+/* -------- Nation Panel (right side) -------- */
+.nation-panel {
+  position: absolute;
+  top: 78px;
+  right: 20px;
+  bottom: 20px;
+  width: 420px;
+  z-index: 25;
+  background:
+    linear-gradient(180deg, #f0dfa8 0%, #dcc38a 100%),
+    radial-gradient(ellipse at top, rgba(255,240,200,0.5), transparent 70%);
+  border: 2px solid var(--gold-deep);
+  border-radius: 3px;
+  box-shadow: var(--panel-shadow);
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+  overflow: hidden;
+  animation: slideIn 220ms ease;
+}
+@keyframes slideIn {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+.nation-panel .np-header {
+  padding: 14px 18px 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.15), transparent);
+  border-bottom: 1px solid var(--edge);
+  position: relative;
+}
+.nation-panel .np-close {
+  position: absolute; top: 8px; right: 10px;
+  background: transparent; border: none;
+  color: var(--ink); font-size: 22px; cursor: pointer;
+  font-family: serif; line-height: 1;
+}
+.nation-panel .np-close:hover { color: var(--burgundy); }
+.nation-panel .np-crest {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  box-shadow: inset 0 0 0 2px var(--parchment), 0 2px 6px rgba(0,0,0,0.3);
+  display: inline-block; vertical-align: middle;
+  margin-right: 12px;
+}
+.nation-panel .np-title {
+  display: inline-block; vertical-align: middle;
+  max-width: calc(100% - 68px);
+}
+.nation-panel .np-name {
+  font-family: 'Cinzel', serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 1px;
+  line-height: 1.15;
+}
+.nation-panel .np-tier {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--burgundy);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.nation-panel .np-body {
+  padding: 14px 18px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+.nation-panel .np-body::-webkit-scrollbar { width: 8px; }
+.nation-panel .np-body::-webkit-scrollbar-thumb {
+  background: var(--edge); border-radius: 4px;
+}
+.nation-panel .np-body::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
+
+.np-section {
+  margin-bottom: 14px;
+}
+.np-section-title {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--burgundy);
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(107,74,36,0.4);
+  padding-bottom: 3px;
+  margin-bottom: 6px;
+}
+.np-kv {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 4px 10px;
+  font-family: 'EB Garamond', serif;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.np-kv .k {
+  font-variant: small-caps;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.np-kv .v { color: var(--ink); }
+.np-lore {
+  font-family: 'EB Garamond', serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  text-align: justify;
+}
+.np-lore p { margin: 0 0 8px; }
+.np-motto {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--burgundy);
+  border-left: 2px solid var(--gold-deep);
+  padding-left: 10px;
+  margin: 8px 0;
+}
+.np-list-item {
+  padding: 4px 6px;
+  border-bottom: 1px dotted rgba(107,74,36,0.35);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 100ms;
+}
+.np-list-item:hover {
+  background: rgba(107,74,36,0.15);
+}
+.np-list-item .name {
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--ink);
+}
+.np-list-item .type {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  margin-left: 6px;
+}
+.np-list-item .desc { font-size: 12px; color: var(--ink-soft); }
+
+.np-relation {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 3px 0;
+}
+.np-relation .badge {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 2px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  color: #fff;
+}
+.np-relation .badge.alliance    { background: #2f6b4a; }
+.np-relation .badge.rivalry     { background: #a44a1c; }
+.np-relation .badge.war         { background: #7a1a1a; }
+.np-relation .badge.trade       { background: #5a4a1c; }
+.np-relation .badge.vassal      { background: #4a2a5c; }
+.np-relation .badge.personal_union { background: #3d5a80; }
+
+.np-metric {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0;
+  font-size: 13px;
+}
+.np-metric .bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(43,27,13,0.2);
+  border-radius: 1px;
+  overflow: hidden;
+  border: 1px solid rgba(43,27,13,0.3);
+}
+.np-metric .fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--burgundy), var(--gold));
+}
+
+/* -------- Freeform Editor -------- */
+.editor-bar {
+  position: absolute;
+  top: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 22;
+  background: linear-gradient(180deg, rgba(60,32,12,0.98), rgba(30,16,6,0.98));
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  padding: 10px 16px;
+  color: var(--parchment);
+  box-shadow: var(--panel-shadow);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'EB Garamond', serif;
+}
+.editor-bar .step {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 2px;
+  color: var(--gold-bright);
+}
+.editor-bar .instr { font-size: 14px; }
+.editor-bar button {
+  background: linear-gradient(180deg, #4a2e14, #2a1a08);
+  color: var(--parchment);
+  border: 1px solid var(--gold-deep);
+  padding: 6px 12px;
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.editor-bar button:hover { color: var(--gold-bright); }
+.editor-bar button.danger {
+  background: linear-gradient(180deg, var(--burgundy), var(--burgundy-deep));
+  color: var(--gold-bright);
+}
+
+.lasso-path {
+  fill: rgba(247, 215, 107, 0.18);
+  stroke: #f7d76b;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+  filter: drop-shadow(0 0 6px rgba(247,215,107,0.7));
+  pointer-events: none;
+}
+
+/* -------- Settlement dialog -------- */
+.settlement-dialog {
+  position: fixed;
+  z-index: 60;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 180ms ease;
+}
+@keyframes fadeIn { from {opacity:0;} to {opacity:1;} }
+.settlement-dialog .card {
+  width: 480px;
+  max-height: 80vh;
+  background: var(--panel-bg);
+  border: 2px solid var(--gold-deep);
+  border-radius: 3px;
+  box-shadow: var(--panel-shadow);
+  color: var(--ink);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: popIn 200ms ease;
+}
+@keyframes popIn { from { transform: scale(0.94); opacity:0;} to {transform:scale(1); opacity:1;} }
+.settlement-dialog .head {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--edge);
+  background: linear-gradient(180deg, rgba(255,255,255,0.15), transparent);
+  position: relative;
+}
+.settlement-dialog .head h3 {
+  margin: 0; font-family: 'Cinzel', serif; font-size: 20px;
+  letter-spacing: 1px; color: var(--ink);
+}
+.settlement-dialog .head .sub {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 12px; letter-spacing: 2px;
+  color: var(--burgundy);
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+.settlement-dialog .head .close {
+  position: absolute; top: 6px; right: 12px;
+  background: transparent; border: none; font-size: 22px; cursor: pointer;
+  color: var(--ink);
+}
+.settlement-dialog .body {
+  padding: 14px 18px 18px;
+  overflow-y: auto;
+  font-family: 'EB Garamond', serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* -------- Tooltip -------- */
+.map-tooltip {
+  position: fixed;
+  z-index: 40;
+  padding: 6px 10px;
+  background: linear-gradient(180deg, rgba(50,28,10,0.98), rgba(30,16,6,0.98));
+  color: var(--parchment);
+  border: 1px solid var(--gold);
+  border-radius: 2px;
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  letter-spacing: 1px;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  white-space: nowrap;
+}
+.map-tooltip .sub {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--gold-bright);
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+/* -------- Info Toast -------- */
+.toast {
+  position: fixed;
+  bottom: 20px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: linear-gradient(180deg, rgba(60,32,12,0.98), rgba(30,16,6,0.98));
+  border: 1px solid var(--gold);
+  color: var(--gold-bright);
+  padding: 10px 24px;
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  letter-spacing: 2px;
+  border-radius: 2px;
+  animation: fadeIn 160ms ease;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+}
+
+/* -------- Trace Panel (manual correction tool) -------- */
+.trace-panel {
+  position: absolute;
+  top: 78px;
+  right: 20px;
+  z-index: 25;
+  width: 250px;
+  background: linear-gradient(180deg, rgba(50,28,10,0.96), rgba(30,16,6,0.96));
+  border: 1px solid var(--gold-deep);
+  border-radius: 4px;
+  padding: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.55);
+}
+.trace-panel.collapsed {
+  width: auto;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+.trace-toggle {
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--gold);
+  background: linear-gradient(180deg, rgba(50,28,10,0.94), rgba(30,16,6,0.94));
+  border: 1px solid var(--gold-deep);
+  border-radius: 4px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+.trace-toggle:hover { transform: translateY(-1px); }
+.trace-panel .head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.trace-panel .title {
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+.trace-panel .close {
+  background: none;
+  border: none;
+  color: var(--parchment);
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.7;
+  transition: opacity 150ms ease;
+}
+.trace-panel .close:hover { opacity: 1; }
+.trace-panel .lbl {
+  display: block;
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--gold);
+  opacity: 0.85;
+  margin: 8px 0 4px;
+  text-transform: uppercase;
+}
+.trace-select {
+  width: 100%;
+  background: rgba(15,8,3,0.85);
+  color: var(--parchment);
+  border: 1px solid var(--gold-deep);
+  border-radius: 3px;
+  padding: 7px 8px;
+  font-family: 'EB Garamond', serif;
+  font-size: 14px;
+  cursor: pointer;
+}
+.trace-select:focus-visible { outline: 2px solid var(--gold); }
+.trace-panel .hint {
+  font-family: 'EB Garamond', serif;
+  font-size: 12.5px;
+  color: var(--parchment);
+  opacity: 0.75;
+  margin-top: 5px;
+  line-height: 1.35;
+}
+.trace-panel .draw-hint {
+  margin-top: 10px;
+  padding: 7px 8px;
+  border: 1px dashed var(--gold-deep);
+  border-radius: 3px;
+  opacity: 0.9;
+}
+.trace-panel .row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: center;
+}
+.trace-panel .row.foot {
+  justify-content: space-between;
+  border-top: 1px solid rgba(184,135,58,0.3);
+  padding-top: 9px;
+}
+.trace-panel button.apply {
+  flex: 1;
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  color: #1a0d04;
+  background: linear-gradient(180deg, #e9c46a, #b8873a);
+  border: 1px solid var(--gold-deep);
+  border-radius: 3px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+.trace-panel button.apply:hover:not(:disabled) { transform: translateY(-1px); }
+.trace-panel button.apply:disabled { opacity: 0.45; cursor: not-allowed; }
+.trace-panel button.ghost {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--parchment);
+  background: none;
+  border: 1px solid rgba(184,135,58,0.5);
+  border-radius: 3px;
+  padding: 7px 10px;
+  cursor: pointer;
+  transition: border-color 150ms ease, opacity 150ms ease;
+}
+.trace-panel button.ghost:hover:not(:disabled) { border-color: var(--gold); }
+.trace-panel button.ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+.trace-panel .count {
+  font-family: 'EB Garamond', serif;
+  font-size: 12.5px;
+  color: var(--parchment);
+  opacity: 0.8;
+}
+
+/* -------- V2: smooth nation shapes + soft borders -------- */
+.nation-shape {
+  transition: fill-opacity 120ms ease;
+  cursor: pointer;
+}
+.nation-shape:hover { fill-opacity: 0.8 !important; }
+.nation-shape.selected { fill-opacity: 0.86 !important; }
+
+.nation-border.soft {
+  fill: none;
+  stroke: #241206;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.62;
+  pointer-events: none;
+}
+.nation-border.soft.selected {
+  stroke: #f7d76b;
+  stroke-width: 2.6;
+  opacity: 1;
+  filter: drop-shadow(0 0 5px rgba(247,215,107,0.65));
+}
+.vassal-sub {
+  fill: none;
+  stroke: #2a180a;
+  stroke-dasharray: 4 3;
+  stroke-linejoin: round;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+/* Provinces view tiles */
+.province-poly.tile {
+  stroke: rgba(30,16,6,0.55);
+  stroke-width: 0.7;
+}
+
+/* Seamless nation colouring (political / religion / vassals): looks like the
+   Provinces tab but with no grid. Each realm is a single merged path, so it is
+   one perfectly flat colour. Hover / selection brighten the whole realm. */
+.nation-fill {
+  cursor: pointer;
+  transition: fill-opacity 120ms ease;
+}
+.nation-fill:hover { fill-opacity: 0.82 !important; }
+.nation-fill.selected { fill-opacity: 0.9 !important; }
+
+/* Settlement labels (screen-px space thanks to counter-scaling) */
+.settlement text.s-label {
+  font-family: 'IM Fell English SC', 'Cinzel', serif;
+  fill: #1a0d04;
+  stroke: #f2e3c1;
+  stroke-width: 2.6;
+  paint-order: stroke;
+  font-size: 11.5px;
+  pointer-events: none;
+  user-select: none;
+}
+.settlement.capital text.s-label { font-size: 14.5px; font-weight: 700; }
+.settlement.city text.s-label { font-size: 12.5px; font-weight: 600; }
+
+/* Influence bars */
+.np-metric .fill.influence { background: linear-gradient(90deg, #8d6a2f, #e9c46a); }
+.np-metric.small { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.np-metric.small .bar { flex: 1; height: 5px; }
+.np-list-item.vassal { display: block; }
